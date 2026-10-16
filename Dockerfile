@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y nodejs npm && \
     rm -rf /var/lib/apt/lists/*
 RUN npm config set registry https://registry.npmmirror.com
 ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
