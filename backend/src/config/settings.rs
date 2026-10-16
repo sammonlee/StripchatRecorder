@@ -160,7 +160,7 @@ impl Default for Settings {
         Self {
             output_dir,
             poll_interval_secs: 30,
-            auto_record: true,
+            auto_record: false,
             api_proxy_url: None,
             cdn_proxy_url: None,
             sc_mirror_url: None,
