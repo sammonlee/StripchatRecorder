@@ -1,7 +1,7 @@
 FROM debian:latest AS builder
 
 RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y curl pkg-config build-essential libssl-dev && \
+    apt-get update && apt-get install -y ca-certificates curl pkg-config build-essential libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
