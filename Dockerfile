@@ -1,19 +1,24 @@
 FROM debian:latest AS builder
 RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y ca-certificates curl pkg-config build-essential libssl-dev nodejs && \
+    apt-get update && apt-get install -y curl pkg-config build-essential libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 RUN npm config set registry https://registry.npmmirror.com
 ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
     RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
 RUN curl --proto '=https' --tlsv1.2 -sSf https://mirrors.ustc.edu.cn/misc/rustup-install.sh | sh -s -- -y && \
-    . ~/.cargo/env && rustup target add x86_64-unknown-linux-gnu
-RUN printf '%s\n' '[source.crates-io]' "replace-with = 'ustc'" '' \
+    . /root/.cargo/env && rustup target add x86_64-unknown-linux-gnu
+RUN mkdir -vp ${CARGO_HOME:-$HOME/.cargo} && \
+    printf '%s\n' \
+    '[source.crates-io]' "replace-with = 'ustc'" '' \
     '[source.ustc]' 'registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"' '' \
     '[registries.ustc]' 'index = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"' \
-    > ~/.cargo/config.toml
+    | tee -a ${CARGO_HOME:-$HOME/.cargo}/config.toml
 WORKDIR /app
 COPY . /app
-RUN . ~/.cargo/env && npm run build
+RUN . /root/.cargo/env && npm run build
 
 FROM debian:latest
 RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
@@ -32,8 +37,12 @@ RUN printf '%s\n' \
     'set -eu' \
     'cp -an /app/stripchat-recorder/modules.default/. /app/stripchat-recorder/modules/' \
     'if [ -f /app/stripchat-recorder/config/settings.json ]; then' \
-    '  [ -n "${LANGUAGE:-}" ] && sed -i "s/\"language\": \"[^\"]*\"/\"language\": \"${LANGUAGE}\"/" /app/stripchat-recorder/config/settings.json' \
-    '  [ -n "${PORT:-}" ] && sed -i "s/\"server_port\": [0-9]*/\"server_port\": ${PORT}/" /app/stripchat-recorder/config/settings.json' \
+    '    if [ -n "${LANGUAGE:-}" ]; then' \
+    '        sed -i "s/\"language\": \"[^\"]*\"/\"language\": \"${LANGUAGE}\"/" /app/stripchat-recorder/config/settings.json' \
+    '    fi' \
+    '    if [ -n "${PORT:-}" ]; then' \
+    '        sed -i "s/\"server_port\": [0-9]*/\"server_port\": ${PORT}/" /app/stripchat-recorder/config/settings.json' \
+    '    fi' \
     'fi' \
     'exec /app/stripchat-recorder/stripchat-recorder "$@"' \
     > /entrypoint.sh && chmod +x /entrypoint.sh
