@@ -31,7 +31,7 @@ pub struct RelayState {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// GET /stream/{modelname}
+/// GET /stream/{modelname} 或 GET /stream/{modelname}.m3u8
 ///
 /// 按需启动转发 worker，持续输出 MPEG-TS 字节流。
 /// 播放器直接打开此 URL 即可播放，无需任何预先配置。
@@ -40,8 +40,18 @@ pub struct RelayState {
 /// Players open this URL directly without any prior configuration.
 pub async fn stream_handler(
     AxumState(s): AxumState<RelayState>,
-    Path(modelname): Path<String>,
+    Path(raw_modelname): Path<String>,
 ) -> Response {
+    // 兼容处理：如果请求路径带有 .m3u8 后缀，自动将其剥离以获取真实的用户名
+    let modelname = if raw_modelname.ends_with(".m3u8") {
+        raw_modelname.trim_end_matches(".m3u8").to_string()
+    } else {
+        raw_modelname
+    };
+
+    // 判断请求是否显式使用了 .m3u8 后缀，以此决定返回的 Content-Type
+    let is_m3u8_request = raw_modelname.ends_with(".m3u8");
+
     // 若没有活跃会话，自动启动 worker / Auto-start worker if no active session
     if !s.relay_manager.has_session(&modelname) {
         let (stop_tx, ts_tx) = start_streamer(
@@ -98,9 +108,16 @@ pub async fn stream_handler(
         }
     };
 
+    // 根据请求的后缀动态调整响应头中的 Content-Type
+    let content_type = if is_m3u8_request {
+        "application/vnd.apple.mpegurl"
+    } else {
+        "video/mp2t"
+    };
+
     (
         [
-            (header::CONTENT_TYPE, "video/mp2t"),
+            (header::CONTENT_TYPE, content_type),
             (header::CACHE_CONTROL, "no-cache, no-store"),
             (header::ACCESS_CONTROL_ALLOW_ORIGIN, "*"),
             (header::TRANSFER_ENCODING, "chunked"),
