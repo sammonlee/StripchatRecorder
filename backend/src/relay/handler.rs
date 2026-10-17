@@ -42,15 +42,15 @@ pub async fn stream_handler(
     AxumState(s): AxumState<RelayState>,
     Path(raw_modelname): Path<String>,
 ) -> Response {
-    // 兼容处理：如果请求路径带有 .m3u8 后缀，自动将其剥离以获取真实的用户名
-    let modelname = if raw_modelname.ends_with(".m3u8") {
+    // ✅ 第一步：先判断（只借用，不夺走所有权）
+    let is_m3u8_request = raw_modelname.ends_with(".m3u8");
+
+    // ✅ 第二步：再处理剥离后缀（此时才安全地消耗 raw_modelname）
+    let modelname = if is_m3u8_request {
         raw_modelname.trim_end_matches(".m3u8").to_string()
     } else {
         raw_modelname
     };
-
-    // 判断请求是否显式使用了 .m3u8 后缀，以此决定返回的 Content-Type
-    let is_m3u8_request = raw_modelname.ends_with(".m3u8");
 
     // 若没有活跃会话，自动启动 worker / Auto-start worker if no active session
     if !s.relay_manager.has_session(&modelname) {
