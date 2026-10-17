@@ -174,7 +174,7 @@ impl Default for Settings {
             server_port: default_server_port(),
             mouflon_sync_url: default_mouflon_sync_url(),
             mouflon_sync_token: None,
-            setup_done: false,
+            setup_done: true,
         }
     }
 }
