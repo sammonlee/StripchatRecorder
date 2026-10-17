@@ -13,7 +13,8 @@ RUN mkdir -p /etc/apt/keyrings && \
 RUN npm config set registry https://registry.npmmirror.com
 
 ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
-    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
+    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup \
+    NODE_OPTIONS="--max-old-space-size=2048"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://mirrors.ustc.edu.cn/misc/rustup-install.sh | sh -s -- -y && \
     . /root/.cargo/env && rustup target add x86_64-unknown-linux-gnu
@@ -32,7 +33,7 @@ RUN . /root/.cargo/env && npm run build
 # ── Runtime image ──────────────────────────────────────────────────────────────
 FROM debian:latest
 RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y ffmpeg ca-certificates libssl3 && \
+    apt-get update && apt-get install -y ffmpeg ca-certificates libssl3 curl && \
     rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app/stripchat-recorder/logs \
@@ -51,6 +52,18 @@ RUN chmod +x /app/stripchat-recorder/stripchat-recorder
 RUN printf '%s\n' \
     '#!/bin/sh' \
     'set -eu' \
+    '# 1. 启动时从 Cloudflare 同步配置文件和主播列表' \
+    'if [ -n "${CF_CONFIG_URL:-}" ] && [ -n "${CF_TOKEN:-}" ]; then' \
+    '    echo "Syncing config files from Cloudflare..."' \
+    '    curl -s -H "Authorization: Bearer ${CF_TOKEN}" "${CF_CONFIG_URL}?file=settings" -o /app/stripchat-recorder/config/settings.json.cloud || true' \
+    '    if [ -s /app/stripchat-recorder/config/settings.json.cloud ]; then' \
+    '        mv /app/stripchat-recorder/config/settings.json.cloud /app/stripchat-recorder/config/settings.json' \
+    '    fi' \
+    '    curl -s -H "Authorization: Bearer ${CF_TOKEN}" "${CF_CONFIG_URL}?file=streamers" -o /app/stripchat-recorder/config/streamers.json.cloud || true' \
+    '    if [ -s /app/stripchat-recorder/config/streamers.json.cloud ]; then' \
+    '        mv /app/stripchat-recorder/config/streamers.json.cloud /app/stripchat-recorder/config/streamers.json' \
+    '    fi' \
+    'fi' \
     'cp -an /app/stripchat-recorder/modules.default/. /app/stripchat-recorder/modules/' \
     'if [ -f /app/stripchat-recorder/config/settings.json ]; then' \
     '    if [ -n "${LANGUAGE:-}" ]; then' \
