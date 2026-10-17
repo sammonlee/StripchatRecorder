@@ -1,6 +1,6 @@
 {
   "output_dir": "/app/stripchat-recorder/recordings",
-  "poll_interval_secs": 30,
+  "poll_interval_secs": 34,
   "auto_record": false,
   "api_proxy_url": null,
   "cdn_proxy_url": null,
