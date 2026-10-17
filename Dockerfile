@@ -12,8 +12,7 @@ RUN mkdir -p /etc/apt/keyrings && \
 RUN npm config set registry https://registry.npmmirror.com
 
 ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
-    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup \
-    NODE_OPTIONS="--max-old-space-size=2048"
+    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://mirrors.ustc.edu.cn/misc/rustup-install.sh | sh -s -- -y && \
     . /root/.cargo/env && rustup target add x86_64-unknown-linux-gnu
