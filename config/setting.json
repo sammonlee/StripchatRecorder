@@ -15,5 +15,5 @@
   "server_port": 3030,
   "mouflon_sync_url": "https://mouflon.chantrail.com",
   "mouflon_sync_token": null,
-  "setup_done": false
+  "setup_done": true
 }
