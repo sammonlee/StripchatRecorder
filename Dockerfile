@@ -1,6 +1,5 @@
 FROM debian:latest AS builder
-RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y ca-certificates curl gnupg pkg-config build-essential libssl-dev && \
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg pkg-config build-essential libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # 导入 NodeSource 官方 GPG Key 并配置 Node.js 20.x 仓库
@@ -10,20 +9,8 @@ RUN mkdir -p /etc/apt/keyrings && \
     apt-get update && apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-RUN npm config set registry https://registry.npmmirror.com
-
-ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
-    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://mirrors.ustc.edu.cn/misc/rustup-install.sh | sh -s -- -y && \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     . /root/.cargo/env && rustup target add x86_64-unknown-linux-gnu
-
-RUN mkdir -vp ${CARGO_HOME:-$HOME/.cargo} && \
-    printf '%s\n' \
-    '[source.crates-io]' "replace-with = 'ustc'" '' \
-    '[source.ustc]' 'registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"' '' \
-    '[registries.ustc]' 'index = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"' \
-    | tee -a ${CARGO_HOME:-$HOME/.cargo}/config.toml
 
 WORKDIR /app
 COPY . /app
@@ -31,8 +18,7 @@ RUN . /root/.cargo/env && npm run build
 
 # ── Runtime image ──────────────────────────────────────────────────────────────
 FROM debian:latest
-RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y ffmpeg ca-certificates libssl3 && \
+RUN apt-get update && apt-get install -y ffmpeg ca-certificates libssl3 curl && \
     rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app/stripchat-recorder/logs \
