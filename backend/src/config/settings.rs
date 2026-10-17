@@ -174,7 +174,7 @@ impl Default for Settings {
             server_port: default_server_port(),
             mouflon_sync_url: default_mouflon_sync_url(),
             mouflon_sync_token: None,
-            setup_done: true,
+            setup_done: false,
         }
     }
 }
@@ -297,19 +297,6 @@ impl AppState {
     /// Returns the log directory path (logs folder next to the executable).
     pub fn log_dir() -> PathBuf {
         exe_dir().join("logs")
-    }
-
-    /// 将当前 `AppData` 拆分序列化并分别写入各配置文件。
-    /// Serialize the current `AppData` into split config files.
-    pub fn save(&self) -> Result<()> {
-        let data = self.data.read();
-        let dir = &self.config_dir;
-        fs::write(dir.join("settings.json"), serde_json::to_string_pretty(&data.settings)?)?;
-        fs::write(dir.join("streamers.json"), serde_json::to_string_pretty(&data.streamers)?)?;
-        fs::write(dir.join("mouflon_keys.json"), serde_json::to_string_pretty(&data.mouflon_keys)?)?;
-        fs::write(dir.join("pipeline.json"), serde_json::to_string_pretty(&data.pipeline)?)?;
-        fs::write(dir.join("pp_results.json"), serde_json::to_string_pretty(&data.pp_results)?)?;
-        Ok(())
     }
 
     /// 将当前 `AppData` 拆分序列化并分别写入各配置文件，并在后台异步同步到 Cloudflare KV。
