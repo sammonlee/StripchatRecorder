@@ -174,7 +174,7 @@ impl Default for Settings {
             server_port: default_server_port(),
             mouflon_sync_url: default_mouflon_sync_url(),
             mouflon_sync_token: None,
-            setup_done: true,
+            setup_done: false,
         }
     }
 }
@@ -309,6 +309,97 @@ impl AppState {
         fs::write(dir.join("mouflon_keys.json"), serde_json::to_string_pretty(&data.mouflon_keys)?)?;
         fs::write(dir.join("pipeline.json"), serde_json::to_string_pretty(&data.pipeline)?)?;
         fs::write(dir.join("pp_results.json"), serde_json::to_string_pretty(&data.pp_results)?)?;
+        Ok(())
+    }
+
+    /// 将当前 `AppData` 拆分序列化并分别写入各配置文件，并在后台异步同步到 Cloudflare KV。
+    /// Serialize the current `AppData` into split config files and asynchronously sync to Cloudflare KV in the background.
+    pub fn save(&self) -> Result<()> {
+        let data = self.data.read();
+        let dir = &self.config_dir;
+        
+        // 1. 序列化各配置文件内容
+        let settings_str = serde_json::to_string_pretty(&data.settings)?;
+        let streamers_str = serde_json::to_string_pretty(&data.streamers)?;
+        let mouflon_str = serde_json::to_string_pretty(&data.mouflon_keys)?;
+        let pipeline_str = serde_json::to_string_pretty(&data.pipeline)?;
+        let results_str = serde_json::to_string_pretty(&data.pp_results)?;
+
+        // 2. 严格保持原有的本地写入逻辑[cite: 2]
+        fs::write(dir.join("settings.json"), &settings_str)?;
+        fs::write(dir.join("streamers.json"), &streamers_str)?;
+        fs::write(dir.join("mouflon_keys.json"), &mouflon_str)?;
+        fs::write(dir.join("pipeline.json"), &pipeline_str)?;
+        fs::write(dir.join("pp_results.json"), &results_str)?;
+        
+        // 释放读锁，避免阻塞后台异步任务
+        drop(data);
+
+        // 3. 增加我们的微小逻辑：异步上报功能
+        // 检查环境变量中是否有 CF_CONFIG_URL 和 CF_TOKEN，若有则异步 PUT 到 Cloudflare KV
+        let settings_payload = settings_str;
+        let streamers_payload = streamers_str;
+
+        tokio::spawn(async move {
+            let config_url = std::env::var("CF_CONFIG_URL").ok();
+            let token = std::env::var("CF_TOKEN").ok();
+
+            let (Some(url), Some(tok)) = (config_url, token) else {
+                return; // 未配置环境变量则直接跳过，不影响本地任何业务
+            };
+
+            // 构建 reqwest 客户端
+            let client = match reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build() 
+            {
+                Ok(c) => c,
+                Err(_) => return,
+            };
+
+            let base_url = url.trim_end_matches('/');
+
+            // 同步 settings.json
+            let settings_endpoint = format!("{}?file=settings", base_url);
+            match client.put(&settings_endpoint)
+                .header("Authorization", format!("Bearer {}", tok))
+                .header("Content-Type", "application/json")
+                .body(settings_payload)
+                .send()
+                .await 
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    tracing::info!("Cloudflare sync: settings.json uploaded successfully.");
+                }
+                Ok(resp) => {
+                    tracing::warn!("Cloudflare sync failed for settings.json, status: {}", resp.status());
+                }
+                Err(e) => {
+                    tracing::warn!("Cloudflare sync error for settings.json: {}", e);
+                }
+            }
+
+            // 同步 streamers.json
+            let streamers_endpoint = format!("{}?file=streamers", base_url);
+            match client.put(&streamers_endpoint)
+                .header("Authorization", format!("Bearer {}", tok))
+                .header("Content-Type", "application/json")
+                .body(streamers_payload)
+                .send()
+                .await 
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    tracing::info!("Cloudflare sync: streamers.json uploaded successfully.");
+                }
+                Ok(resp) => {
+                    tracing::warn!("Cloudflare sync failed for streamers.json, status: {}", resp.status());
+                }
+                Err(e) => {
+                    tracing::warn!("Cloudflare sync error for streamers.json: {}", e);
+                }
+            }
+        });
+
         Ok(())
     }
 
