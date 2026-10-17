@@ -51,10 +51,14 @@ RUN chmod +x /app/stripchat-recorder/stripchat-recorder
 RUN printf '%s\n' \
     '#!/bin/sh' \
     'set -eu' \
-    '# 1. 启动时自动从 Cloudflare Worker 拉取最新配置到本地' \
     'if [ -n "${CF_CONFIG_URL:-}" ] && [ -n "${CF_TOKEN:-}" ]; then' \
-    '    echo "Fetching config from Cloudflare..."' \
-    '    curl -s -H "Authorization: Bearer ${CF_TOKEN}" "${CF_CONFIG_URL}" -o /app/stripchat-recorder/config/settings.json || true' \
+    '    echo "Fetching configs from Cloudflare..."' \
+    '    for f in settings streamers; do' \
+    '        curl -s -H "Authorization: Bearer ${CF_TOKEN}" "${CF_CONFIG_URL}?file=${f}" -o /app/stripchat-recorder/config/${f}.json.cloud || true' \
+    '        if [ -s /app/stripchat-recorder/config/${f}.json.cloud ]; then' \
+    '            mv /app/stripchat-recorder/config/${f}.json.cloud /app/stripchat-recorder/config/${f}.json' \
+    '        fi' \
+    '    done' \
     'fi' \
     'cp -an /app/stripchat-recorder/modules.default/. /app/stripchat-recorder/modules/' \
     'if [ -f /app/stripchat-recorder/config/settings.json ]; then' \
